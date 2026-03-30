@@ -32,6 +32,18 @@ CREATE POLICY "Usuarios pueden actualizar sus propios avisos" ON avisos
 CREATE POLICY "Usuarios pueden borrar sus propios avisos" ON avisos
     FOR DELETE USING (auth.uid() = user_id);
 
--- 4. Storage Bucket
--- Recuerda crear un bucket llamado 'avisomap_files' en el apartado STORAGE
--- de Supabase y ponlo como PUBLIC para que las fotos se vean correctamente.
+-- 4. Storage Bucket Setup
+-- Create the bucket for files if it doesn't exist
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('avisomap_files', 'avisomap_files', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Storage Policies for 'avisomap_files'
+CREATE POLICY "Permitir subida a usuarios autenticados" ON storage.objects
+    FOR INSERT WITH CHECK (bucket_id = 'avisomap_files' AND auth.role() = 'authenticated');
+
+CREATE POLICY "Permitir lectura pública de archivos" ON storage.objects
+    FOR SELECT USING (bucket_id = 'avisomap_files');
+
+CREATE POLICY "Permitir borrar sus propios archivos" ON storage.objects
+    FOR DELETE USING (bucket_id = 'avisomap_files' AND auth.uid() = owner);
