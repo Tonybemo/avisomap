@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Avisomap - Control de Plagas</title>
+    <meta name="description" content="Gestión de avisos con mapas">
+    <meta name="theme-color" content="#2e7d32">
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="login-screen" class="login-overlay hidden">
+        <div class="login-card">
+            <div class="login-logo"><i class="fas fa-map-location-dot"></i></div>
+            <h2>Bienvenido a Avisomap</h2>
+            <p>Identifícate para gestionar tus avisos</p>
+            
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="tab-login">Entrar</button>
+                <button class="auth-tab" id="tab-signup">Registro</button>
+            </div>
+
+            <form id="auth-form">
+                <div class="form-group" style="text-align: left;">
+                    <label>Email</label>
+                    <input type="email" id="auth-email" class="form-input" required placeholder="tu@email.com">
+                </div>
+                <div class="form-group" style="text-align: left;">
+                    <label>Contraseña</label>
+                    <input type="password" id="auth-password" class="form-input" required placeholder="••••••••">
+                </div>
+                <button type="submit" class="btn-primary" id="auth-submit">INICIAR SESIÓN</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main App UI -->
+    <div id="app" class="hidden">
+        <nav class="navbar">
+            <div class="nav-logo"><i class="fas fa-map-location-dot"></i> <span>Avisomap</span></div>
+            <div class="nav-actions">
+                <button id="sync-btn"><i class="fas fa-sync"></i></button>
+                <button id="logout-btn" class="btn-logout"><i class="fas fa-sign-out-alt"></i></button>
+            </div>
+        </nav>
+
+        <main id="main-content">
+            <div id="view-container">
+                <div class="loading-screen"><div class="spinner"></div><p>Cargando Avisomap...</p></div>
+            </div>
+        </main>
+
+        <nav class="tab-bar">
+            <button class="tab-item" data-view="list"><i class="fas fa-list-ul"></i><span>Avisos</span></button>
+            <button class="tab-item" data-view="form"><i class="fas fa-circle-plus"></i><span>Nuevo</span></button>
+            <button class="tab-item" data-view="calendar"><i class="fas fa-calendar-alt"></i><span>Agenda</span></button>
+        </nav>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    
+    <script>
+        // --- Configuration ---
+        const SUPABASE_URL = 'https://cuhbqppdndzvxvlhlszn.supabase.co'; 
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN1aGJxcHBkbmR6dnh2bGhsc3puIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5MzE4MTIsImV4cCI6MjA4NzUwNzgxMn0.OjYCEu7btiWjA9gvm3lB5bpfMJYBWx3J5LJsO22RrJk'; 
+        let supabaseClient = null;
+        let currentUser = null;
+        let currentView = 'list';
+        let avisos = [];
+        let viewContainer, tabItems, appUI, loginScreen;
+
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', () => {
+            viewContainer = document.getElementById('view-container');
+            tabItems = document.querySelectorAll('.tab-item');
+            appUI = document.getElementById('app');
+            loginScreen = document.getElementById('login-screen');
+
+            // Initialize Supabase if credentials are provided
+            if (SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                checkUser();
+            } else {
+                // Mockup mode for preview
+                loginScreen.classList.add('hidden');
+                appUI.classList.remove('hidden');
+                switchView('list');
+            }
+
+            setupEventListeners();
+        });
+
+        async function checkUser() {
+            const { data: { user } } = await supabaseClient.auth.getUser();
+            if (user) {
+                currentUser = user;
+                loginScreen.classList.add('hidden');
+                appUI.classList.remove('hidden');
+                loadRealData();
+            } else {
+                loginScreen.classList.remove('hidden');
+                appUI.classList.add('hidden');
+            }
+        }
+
+        function setupEventListeners() {
+            tabItems.forEach(item => item.addEventListener('click', () => switchView(item.dataset.view)));
+            
+            document.getElementById('auth-form').addEventListener('submit', handleAuth);
+            document.getElementById('logout-btn').addEventListener('click', () => supabaseClient.auth.signOut().then(() => checkUser()));
+            
+            document.getElementById('tab-login').onclick = () => setAuthMode('login');
+            document.getElementById('tab-signup').onclick = () => setAuthMode('signup');
+        }
+
+        // --- Auth Logic ---
+        let authMode = 'login';
+        function setAuthMode(mode) {
+            authMode = mode;
+            document.getElementById('tab-login').classList.toggle('active', mode === 'login');
+            document.getElementById('tab-signup').classList.toggle('active', mode === 'signup');
+            document.getElementById('auth-submit').innerText = mode === 'login' ? 'INICIAR SESIÓN' : 'CREAR CUENTA';
+        }
+
+        async function handleAuth(e) {
+            e.preventDefault();
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            const btn = document.getElementById('auth-submit');
+            btn.disabled = true;
+
+            try {
+                let result;
+                if (authMode === 'login') {
+                    result = await supabaseClient.auth.signInWithPassword({ email, password });
+                } else {
+                    result = await supabaseClient.auth.signUp({ email, password });
+                    if (!result.error) alert('¡Revisa tu email para confirmar el registro!');
+                }
+
+                if (result.error) throw result.error;
+                checkUser();
+            } catch (err) {
+                alert('Error: ' + err.message);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        // --- Data Logic ---
+        async function loadRealData() {
+            if (!supabaseClient) return;
+            const { data, error } = await supabaseClient
+                .from('avisos')
+                .select('*')
+                .order('fecha', { ascending: false });
+            
+            if (data) {
+                avisos = data;
+                renderView(currentView);
+            }
+        }
+
+        function switchView(view) {
+            currentView = view;
+            tabItems.forEach(item => item.classList.toggle('active', item.dataset.view === view));
+            renderView(view);
+        }
+
+        function renderView(view) {
+            if (view === 'list') renderListView();
+            if (view === 'form') renderFormView();
+            if (view === 'calendar') renderCalendarView();
+        }
+
+        // --- List View ---
+        function renderListView() {
+            viewContainer.innerHTML = `<div class="view-header"><h2>Mis Avisos</h2><p class="subtitle">Trabajos registrados</p></div><div id="avisos-list"></div>`;
+            const listEl = document.getElementById('avisos-list');
+            
+            if (avisos.length === 0) {
+                listEl.innerHTML = '<div style="text-align:center; padding:3rem; color:gray;"><i class="fas fa-folder-open" style="font-size:3rem; margin-bottom:1rem;"></i><p>No hay avisos guardados</p></div>';
+                return;
+            }
+
+            const groups = {};
+            avisos.forEach(av => {
+                const date = new Date(av.fecha);
+                const key = date.toLocaleString('es-ES', { month: 'long', year: 'numeric' });
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(av);
+            });
+
+            listEl.innerHTML = Object.keys(groups).map(group => `
+                <div class="month-group">
+                    <h4 class="group-title">${group}</h4>
+                    ${groups[group].map(aviso => `
+                        <div class="card aviso-card animate-in">
+                            <div class="card-header">
+                                <div class="pest-icon" style="font-size:1.5rem;">${getPestIcon(aviso.plaga)}</div>
+                                <div class="card-title"><h3>${aviso.direccion}</h3><span class="badge locality">${aviso.localidad}</span></div>
+                            </div>
+                            <div class="card-body">
+                                <div class="info-row">
+                                    <span class="badge date">${aviso.fecha}</span>
+                                    <span class="badge time">${aviso.hora}</span>
+                                </div>
+                                <p class="card-notes">${aviso.notas || 'Sin notas'}</p>
+                                ${aviso.archivo_url ? `<a href="${aviso.archivo_url}" target="_blank" style="font-size:0.8rem; color:var(--primary); text-decoration:none; display:block; margin-top:0.5rem;"><i class="fas fa-paperclip"></i> Ver adjunto</a>` : ''}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `).join('');
+        }
+
+        // --- Form View with Storage ---
+        function renderFormView() {
+            viewContainer.innerHTML = `
+                <div class="view-header"><h2>Nuevo Aviso</h2></div>
+                <form id="aviso-form" class="animate-in">
+                    <div class="form-group">
+                        <label>Dirección</label>
+                        <div class="input-with-icon" style="position:relative;">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="direccion" class="form-input" placeholder="Escribe dirección..." required autocomplete="off">
+                            <div id="suggestions" class="suggestions-list hidden"></div>
+                        </div>
+                    </div>
+                    <div class="form-group"><label>Localidad</label><input type="text" id="localidad" class="form-input" required></div>
+                    <div class="form-row">
+                        <div class="form-group"><label>Fecha</label><input type="date" id="fecha" class="form-input" required value="${new Date().toISOString().split('T')[0]}"></div>
+                        <div class="form-group"><label>Hora</label><input type="time" id="hora" class="form-input" required value="${new Date().toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'})}"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>Plaga</label>
+                        <select id="plaga" class="form-input"><option>Ratones</option><option>Ratas</option><option>Cucarachas</option><option>Hormigas</option><option>Pulgas</option></select>
+                    </div>
+                    <div class="form-group"><label>Notas</label><textarea id="notas" class="form-input" rows="3"></textarea></div>
+                    <div class="form-group">
+                        <label>Adjuntar Foto / Albarán</label>
+                        <div class="file-upload" onclick="document.getElementById('archivo').click()">
+                            <i class="fas fa-camera"></i> <span id="file-name">Toca para subir</span>
+                            <input type="file" id="archivo" accept="image/*,.pdf" style="display:none;" onchange="document.getElementById('file-name').innerText = this.files[0].name">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-primary" id="save-btn">Guardar Aviso</button>
+                </form>
+            `;
+
+            // Autocomplete Logic
+            const dirInput = document.getElementById('direccion');
+            const suggestionsEl = document.getElementById('suggestions');
+            dirInput.addEventListener('input', debounce(async (e) => {
+                const q = e.target.value;
+                if (q.length < 3) { suggestionsEl.classList.add('hidden'); return; }
+                suggestionsEl.innerHTML = '<div class="suggestion-item">Buscando...</div>';
+                suggestionsEl.classList.remove('hidden');
+                try {
+                    const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=5&lang=es`);
+                    const data = await res.json();
+                    suggestionsEl.innerHTML = data.features.map(f => {
+                        const p = f.properties;
+                        const label = `${p.name || ''} ${p.street || ''} ${p.housenumber || ''}, ${p.city || p.state || ''}`.trim();
+                        return `<div class="suggestion-item" onclick="selectSuggestion('${label}', '${p.city || p.state || ''}')">${label}</div>`;
+                    }).join('');
+                } catch (err) { suggestionsEl.innerHTML = '<div class="suggestion-item" style="color:red;">Error local (CORS)</div>'; }
+            }, 400));
+
+            document.getElementById('aviso-form').addEventListener('submit', saveAviso);
+        }
+
+        window.selectSuggestion = (label, city) => {
+            document.getElementById('direccion').value = label;
+            document.getElementById('localidad').value = city;
+            document.getElementById('suggestions').classList.add('hidden');
+        };
+
+        async function saveAviso(e) {
+            e.preventDefault();
+            const btn = document.getElementById('save-btn');
+            btn.disabled = true;
+            btn.innerText = 'Guardando...';
+
+            try {
+                let fileUrl = null;
+                const file = document.getElementById('archivo').files[0];
+                
+                if (file && supabaseClient) {
+                    const fileName = `${Date.now()}_${file.name}`;
+                    const { data, error } = await supabaseClient.storage
+                        .from('avisomap_files')
+                        .upload(fileName, file);
+                    if (error) throw error;
+                    const { data: { publicUrl } } = supabaseClient.storage.from('avisomap_files').getPublicUrl(fileName);
+                    fileUrl = publicUrl;
+                }
+
+                const payload = {
+                    user_id: currentUser?.id,
+                    direccion: document.getElementById('direccion').value,
+                    localidad: document.getElementById('localidad').value,
+                    fecha: document.getElementById('fecha').value,
+                    hora: document.getElementById('hora').value,
+                    plaga: document.getElementById('plaga').value,
+                    notas: document.getElementById('notas').value,
+                    archivo_url: fileUrl
+                };
+
+                if (supabaseClient) {
+                    const { error } = await supabaseClient.from('avisos').insert(payload);
+                    if (error) throw error;
+                } else {
+                    avisos.unshift(payload); // Mockup fallback
+                }
+
+                alert('¡Aviso guardado con éxito!');
+                loadRealData();
+                switchView('list');
+            } catch (err) {
+                alert('Error al guardar: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'Guardar Aviso';
+            }
+        }
+
+        // --- Calendar Logic ---
+        function renderCalendarView() {
+            viewContainer.innerHTML = `<div class="view-header"><h2>Agenda</h2></div><div class="calendar-container"><div class="calendar-grid" id="calendar-body"></div><div id="day-details" style="margin-top:2rem;"></div></div>`;
+            const body = document.getElementById('calendar-body');
+            const now = new Date();
+            const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+            let html = ['dom', 'lun', 'mar', 'mie', 'jue', 'vie', 'sab'].map(d => `<div class="calendar-day-name">${d}</div>`).join('');
+            for (let i = 1; i <= daysInMonth; i++) {
+                const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                const hasAviso = avisos.some(a => a.fecha === dateStr);
+                html += `<div class="calendar-day ${hasAviso ? 'has-aviso' : ''}" onclick="showDayDetails('${dateStr}')">${i}</div>`;
+            }
+            body.innerHTML = html;
+        }
+
+        window.showDayDetails = (date) => {
+            const detailsEl = document.getElementById('day-details');
+            const dayAvisos = avisos.filter(a => a.fecha === date);
+            detailsEl.innerHTML = dayAvisos.length === 0 ? `<p style="text-align:center; color:gray;">Sin avisos para el ${date}</p>` : 
+                `<h4>Avisos para ${date}</h4>` + dayAvisos.map(a => `<div class="card" style="padding:10px; margin-top:5px;"><strong>${a.hora}</strong> - ${a.direccion}</div>`).join('');
+        }
+
+        function getPestIcon(p) { const i = { 'Ratones': '🐁', 'Ratas': '🐀', 'Cucarachas': '🪳', 'Hormigas': '🐜', 'Pulgas': '🦟' }; return i[p] || '🔍'; }
+        function debounce(f, w) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => f(...a), w); }; }
+    </script>
+</body>
+</html>
