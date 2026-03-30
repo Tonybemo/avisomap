@@ -198,25 +198,30 @@
                 groups[key].push(av);
             });
 
-            listEl.innerHTML = Object.keys(groups).map(group => `
-                <div class="month-group">
-                    <h4 class="group-title">${group}</h4>
-                    ${groups[group].map(aviso => `
-                        <div class="card aviso-card animate-in">
-                            <div class="card-header">
-                                <div class="pest-icon" style="font-size:1.5rem;">${getPestIcon(aviso.plaga)}</div>
-                                <div class="card-title"><h3>${aviso.direccion}</h3><span class="badge locality">${aviso.localidad}</span></div>
-                            </div>
-                            <div class="card-body">
-                                <div class="info-row">
-                                    <span class="badge date">${aviso.fecha}</span>
-                                    <span class="badge time">${aviso.hora}</span>
+            listEl.innerHTML = Object.keys(groups).map((group, index) => `
+                <div class="month-group ${index > 0 ? 'collapsed' : ''}" id="group-${index}">
+                    <div class="group-header" onclick="document.getElementById('group-${index}').classList.toggle('collapsed')">
+                        <h4>${group}</h4>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="group-content">
+                        ${groups[group].map(aviso => `
+                            <div class="card aviso-card animate-in">
+                                <div class="card-header">
+                                    <div class="pest-icon" style="font-size:1.5rem;">${getPestIcon(aviso.plaga)}</div>
+                                    <div class="card-title"><h3>${aviso.direccion}</h3><span class="badge locality">${aviso.localidad}</span></div>
                                 </div>
-                                <p class="card-notes">${aviso.notas || 'Sin notas'}</p>
-                                ${aviso.archivo_url ? `<a href="${aviso.archivo_url}" target="_blank" style="font-size:0.8rem; color:var(--primary); text-decoration:none; display:block; margin-top:0.5rem;"><i class="fas fa-paperclip"></i> Ver adjunto</a>` : ''}
+                                <div class="card-body">
+                                    <div class="info-row">
+                                        <span class="badge date">${aviso.fecha}</span>
+                                        <span class="badge time">${aviso.hora}</span>
+                                    </div>
+                                    <p class="card-notes">${aviso.notas || 'Sin notas'}</p>
+                                    ${aviso.archivo_url ? `<a href="${aviso.archivo_url}" target="_blank" style="font-size:0.8rem; color:var(--primary); text-decoration:none; display:block; margin-top:0.5rem;"><i class="fas fa-paperclip"></i> Ver adjunto</a>` : ''}
+                                </div>
                             </div>
-                        </div>
-                    `).join('')}
+                        `).join('')}
+                    </div>
                 </div>
             `).join('');
         }
