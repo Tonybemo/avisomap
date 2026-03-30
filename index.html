@@ -73,6 +73,7 @@
         let supabaseClient = null;
         let currentUser = null;
         let currentView = 'list';
+        let currentCalendarDate = new Date();
         let avisos = [];
         let viewContainer, tabItems, appUI, loginScreen;
 
@@ -200,7 +201,8 @@
 
             listEl.innerHTML = Object.keys(groups).map((group, index) => `
                 <div class="month-group ${index > 0 ? 'collapsed' : ''}" id="group-${index}">
-                    <div class="group-header" onclick="document.getElementById('group-${index}').classList.toggle('collapsed')">
+                    <div class="group-header" onclick="toggleGroup(${index})">
+                        <i class="fas fa-calendar-day"></i>
                         <h4>${group}</h4>
                         <i class="fas fa-chevron-down"></i>
                     </div>
@@ -350,18 +352,62 @@
 
         // --- Calendar Logic ---
         function renderCalendarView() {
-            viewContainer.innerHTML = `<div class="view-header"><h2>Agenda</h2></div><div class="calendar-container"><div class="calendar-grid" id="calendar-body"></div><div id="day-details" style="margin-top:2rem;"></div></div>`;
+            const monthLabel = currentCalendarDate.toLocaleString('es-ES', { month: 'long', year: 'numeric' });
+            
+            viewContainer.innerHTML = `
+                <div class="view-header">
+                    <h2>Agenda</h2>
+                    <p class="subtitle">Planificación mensual</p>
+                </div>
+                <div class="calendar-container">
+                    <div class="calendar-header">
+                        <button class="month-nav-btn" onclick="changeMonth(-1)"><i class="fas fa-chevron-left"></i></button>
+                        <div class="group-header" style="margin-bottom:0;">
+                            <i class="fas fa-calendar-alt"></i>
+                            <h4>${monthLabel}</h4>
+                        </div>
+                        <button class="month-nav-btn" onclick="changeMonth(1)"><i class="fas fa-chevron-right"></i></button>
+                    </div>
+                    <div class="calendar-grid" id="calendar-body"></div>
+                    <div id="day-details" style="margin-top:2rem;"></div>
+                </div>
+            `;
+            
             const body = document.getElementById('calendar-body');
-            const now = new Date();
-            const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-            let html = ['dom', 'lun', 'mar', 'mie', 'jue', 'vie', 'sab'].map(d => `<div class="calendar-day-name">${d}</div>`).join('');
+            const year = currentCalendarDate.getFullYear();
+            const month = currentCalendarDate.getMonth();
+            
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            
+            // Adjust firstDay (0 is Sunday, we want 1 to be Monday)
+            const startOffset = firstDay === 0 ? 6 : firstDay - 1;
+            
+            let html = ['lun', 'mar', 'mie', 'jue', 'vie', 'sab', 'dom'].map(d => `<div class="calendar-day-name">${d}</div>`).join('');
+            
+            // Empty spaces before first day
+            for (let i = 0; i < startOffset; i++) {
+                html += `<div class="calendar-day empty"></div>`;
+            }
+            
             for (let i = 1; i <= daysInMonth; i++) {
-                const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
                 const hasAviso = avisos.some(a => a.fecha === dateStr);
-                html += `<div class="calendar-day ${hasAviso ? 'has-aviso' : ''}" onclick="showDayDetails('${dateStr}')">${i}</div>`;
+                const isToday = new Date().toISOString().split('T')[0] === dateStr;
+                html += `<div class="calendar-day ${hasAviso ? 'has-aviso' : ''} ${isToday ? 'active' : ''}" onclick="showDayDetails('${dateStr}')">${i}</div>`;
             }
             body.innerHTML = html;
         }
+
+        window.changeMonth = (delta) => {
+            currentCalendarDate.setMonth(currentCalendarDate.getMonth() + delta);
+            renderCalendarView();
+        };
+
+        window.toggleGroup = (index) => {
+            const el = document.getElementById(`group-${index}`);
+            el.classList.toggle('collapsed');
+        };
 
         window.showDayDetails = (date) => {
             const detailsEl = document.getElementById('day-details');

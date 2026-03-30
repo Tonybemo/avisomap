@@ -183,32 +183,48 @@ body {
     margin-bottom: 0.5rem;
 }
 
+/* Improved Group Header - Chic Bubble Style */
 .group-header {
-    display: flex;
-    justify-content: space-between;
+    display: inline-flex;
+    justify-content: center;
     align-items: center;
-    padding: 0.8rem 1rem;
-    background: white;
-    border-radius: 12px;
-    margin-bottom: 0.5rem;
-    box-shadow: var(--shadow);
+    gap: 0.8rem;
+    padding: 0.6rem 1.4rem;
+    background: var(--glass);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 50px;
+    margin-bottom: 1.2rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.4);
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    color: var(--primary);
+    font-weight: 600;
 }
 
-.group-header:active { transform: scale(0.98); }
+.month-group {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.group-header:active { 
+    transform: scale(0.95);
+    background: rgba(255, 255, 255, 0.95);
+}
 
 .group-header h4 { 
     margin: 0; 
-    color: var(--primary); 
-    font-size: 0.95rem;
+    color: inherit; 
+    font-size: 0.9rem;
     text-transform: capitalize;
+    letter-spacing: 0.3px;
 }
 
 .group-header i {
-    transition: transform 0.3s ease;
-    color: var(--text-muted);
-    font-size: 0.8rem;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    color: var(--primary-light);
+    font-size: 0.7rem;
 }
 
 .month-group.collapsed .group-content {
@@ -386,19 +402,39 @@ body {
 
 .calendar-header {
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
-    margin-bottom: 1rem;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+    padding: 0 1rem;
 }
+
+.month-nav-btn {
+    background: white;
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.month-nav-btn:active { transform: scale(0.9); }
 
 .calendar-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 5px;
+    gap: 8px;
     background: white;
-    padding: 1rem;
-    border-radius: 15px;
+    padding: 1.2rem;
+    border-radius: 20px;
     box-shadow: var(--shadow);
+    border: 1px solid rgba(0,0,0,0.03);
 }
 
 .calendar-day-name {
