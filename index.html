@@ -264,14 +264,25 @@
                 suggestionsEl.innerHTML = '<div class="suggestion-item">Buscando...</div>';
                 suggestionsEl.classList.remove('hidden');
                 try {
-                    const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=5&lang=es`);
+                    // Usamos Nominatim como alternativa más robusta
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=es&limit=5&addressdetails=1`, {
+                        headers: { 'Accept-Language': 'es' }
+                    });
                     const data = await res.json();
-                    suggestionsEl.innerHTML = data.features.map(f => {
-                        const p = f.properties;
-                        const label = `${p.name || ''} ${p.street || ''} ${p.housenumber || ''}, ${p.city || p.state || ''}`.trim();
-                        return `<div class="suggestion-item" onclick="selectSuggestion('${label}', '${p.city || p.state || ''}')">${label}</div>`;
+                    
+                    if (data.length === 0) {
+                        suggestionsEl.innerHTML = '<div class="suggestion-item">Sin resultados</div>';
+                        return;
+                    }
+
+                    suggestionsEl.innerHTML = data.map(item => {
+                        const label = item.display_name;
+                        const city = item.address.city || item.address.town || item.address.village || '';
+                        return `<div class="suggestion-item" onclick="selectSuggestion('${label.replace(/'/g, "\\'")}', '${city.replace(/'/g, "\\'")}')">${label}</div>`;
                     }).join('');
-                } catch (err) { suggestionsEl.innerHTML = '<div class="suggestion-item" style="color:red;">Error local (CORS)</div>'; }
+                } catch (err) { 
+                    suggestionsEl.innerHTML = `<div class="suggestion-item" style="color:red;">Error: ${err.message}. Intenta con WiFi.</div>`; 
+                }
             }, 400));
 
             document.getElementById('aviso-form').addEventListener('submit', saveAviso);
