@@ -74,6 +74,7 @@
         let currentUser = null;
         let currentView = 'list';
         let currentCalendarDate = new Date();
+        let currentEditingId = null;
         let avisos = [];
         let viewContainer, tabItems, appUI, loginScreen;
 
@@ -219,7 +220,13 @@
                                         <span class="badge time">${aviso.hora}</span>
                                     </div>
                                     <p class="card-notes">${aviso.notas || 'Sin notas'}</p>
-                                    ${aviso.archivo_url ? `<a href="${aviso.archivo_url}" target="_blank" style="font-size:0.8rem; color:var(--primary); text-decoration:none; display:block; margin-top:0.5rem;"><i class="fas fa-paperclip"></i> Ver adjunto</a>` : ''}
+                                </div>
+                                <div class="card-footer">
+                                    <div class="card-actions">
+                                        <button class="action-btn edit" onclick="editAviso('${aviso.id}')" title="Editar"><i class="fas fa-edit"></i></button>
+                                        <button class="action-btn delete" onclick="deleteAviso('${aviso.id}')" title="Eliminar"><i class="fas fa-trash-alt"></i></button>
+                                    </div>
+                                    ${aviso.archivo_url ? `<button class="action-btn view" onclick="window.open('${aviso.archivo_url}', '_blank')" title="Ver adjunto"><i class="fas fa-eye"></i></button>` : ''}
                                 </div>
                             </div>
                         `).join('')}
@@ -229,36 +236,41 @@
         }
 
         // --- Form View with Storage ---
-        function renderFormView() {
+        function renderFormView(editData = null) {
+            currentEditingId = editData ? editData.id : null;
+            
             viewContainer.innerHTML = `
-                <div class="view-header"><h2>Nuevo Aviso</h2></div>
+                <div class="view-header"><h2>${editData ? 'Editar' : 'Nuevo'} Aviso</h2></div>
                 <form id="aviso-form" class="animate-in">
                     <div class="form-group">
                         <label>Dirección</label>
                         <div class="input-with-icon" style="position:relative;">
                             <i class="fas fa-search"></i>
-                            <input type="text" id="direccion" class="form-input" placeholder="Escribe dirección..." required autocomplete="off">
+                            <input type="text" id="direccion" class="form-input" placeholder="Escribe dirección..." required autocomplete="off" value="${editData ? editData.direccion : ''}">
                             <div id="suggestions" class="suggestions-list hidden"></div>
                         </div>
                     </div>
-                    <div class="form-group"><label>Localidad</label><input type="text" id="localidad" class="form-input" required></div>
+                    <div class="form-group"><label>Localidad</label><input type="text" id="localidad" class="form-input" required value="${editData ? editData.localidad : ''}"></div>
                     <div class="form-row">
-                        <div class="form-group"><label>Fecha</label><input type="date" id="fecha" class="form-input" required value="${new Date().toISOString().split('T')[0]}"></div>
-                        <div class="form-group"><label>Hora</label><input type="time" id="hora" class="form-input" required value="${new Date().toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'})}"></div>
+                        <div class="form-group"><label>Fecha</label><input type="date" id="fecha" class="form-input" required value="${editData ? editData.fecha : new Date().toISOString().split('T')[0]}"></div>
+                        <div class="form-group"><label>Hora</label><input type="time" id="hora" class="form-input" required value="${editData ? editData.hora : new Date().toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'})}"></div>
                     </div>
                     <div class="form-group">
                         <label>Plaga</label>
-                        <select id="plaga" class="form-input"><option>Ratones</option><option>Ratas</option><option>Cucarachas</option><option>Hormigas</option><option>Pulgas</option></select>
+                        <select id="plaga" class="form-input">
+                            ${['Ratones', 'Ratas', 'Cucarachas', 'Hormigas', 'Pulgas'].map(p => `<option ${editData?.plaga === p ? 'selected' : ''}>${p}</option>`).join('')}
+                        </select>
                     </div>
-                    <div class="form-group"><label>Notas</label><textarea id="notas" class="form-input" rows="3"></textarea></div>
+                    <div class="form-group"><label>Notas</label><textarea id="notas" class="form-input" rows="3">${editData ? editData.notas : ''}</textarea></div>
                     <div class="form-group">
-                        <label>Adjuntar Foto / Albarán</label>
+                        <label>Adjuntar Foto / Albarán ${editData?.archivo_url ? '(Opcional: cambiar)' : ''}</label>
                         <div class="file-upload" onclick="document.getElementById('archivo').click()">
-                            <i class="fas fa-camera"></i> <span id="file-name">Toca para subir</span>
+                            <i class="fas fa-camera"></i> <span id="file-name">${editData?.archivo_url ? 'Cambiar archivo' : 'Toca para subir'}</span>
                             <input type="file" id="archivo" accept="image/*,.pdf" style="display:none;" onchange="document.getElementById('file-name').innerText = this.files[0].name">
                         </div>
                     </div>
-                    <button type="submit" class="btn-primary" id="save-btn">Guardar Aviso</button>
+                    <button type="submit" class="btn-primary" id="save-btn">${editData ? 'ACTUALIZAR' : 'GUARDAR'} AVISO</button>
+                    ${editData ? `<button type="button" class="btn-detail" style="margin-top:0.5rem;" onclick="switchView('list')">CANCELAR</button>` : ''}
                 </form>
             `;
 
@@ -329,26 +341,57 @@
                     hora: document.getElementById('hora').value,
                     plaga: document.getElementById('plaga').value,
                     notas: document.getElementById('notas').value,
-                    archivo_url: fileUrl
                 };
+                if (fileUrl) payload.archivo_url = fileUrl;
 
                 if (supabaseClient) {
-                    const { error } = await supabaseClient.from('avisos').insert(payload);
-                    if (error) throw error;
+                    let result;
+                    if (currentEditingId) {
+                        result = await supabaseClient.from('avisos').update(payload).eq('id', currentEditingId);
+                    } else {
+                        result = await supabaseClient.from('avisos').insert(payload);
+                    }
+                    if (result.error) throw result.error;
                 } else {
-                    avisos.unshift(payload); // Mockup fallback
+                    if (currentEditingId) {
+                        const idx = avisos.findIndex(a => a.id === currentEditingId);
+                        avisos[idx] = { ...avisos[idx], ...payload };
+                    } else {
+                        avisos.unshift({ ...payload, id: Date.now().toString() });
+                    }
                 }
 
-                alert('¡Aviso guardado con éxito!');
+                alert(currentEditingId ? '¡Aviso actualizado!' : '¡Aviso guardado con éxito!');
                 loadRealData();
                 switchView('list');
             } catch (err) {
                 alert('Error al guardar: ' + err.message);
             } finally {
                 btn.disabled = false;
-                btn.innerText = 'Guardar Aviso';
+                btn.innerText = currentEditingId ? 'ACTUALIZAR AVISO' : 'GUARDAR AVISO';
             }
         }
+
+        window.editAviso = (id) => {
+            const aviso = avisos.find(a => a.id === id);
+            if (aviso) renderFormView(aviso);
+        };
+
+        window.deleteAviso = async (id) => {
+            if (!confirm('¿Seguro que quieres eliminar este aviso?')) return;
+            
+            try {
+                if (supabaseClient) {
+                    const { error } = await supabaseClient.from('avisos').delete().eq('id', id);
+                    if (error) throw error;
+                } else {
+                    avisos = avisos.filter(a => a.id !== id);
+                }
+                loadRealData();
+            } catch (err) {
+                alert('Error al eliminar: ' + err.message);
+            }
+        };
 
         // --- Calendar Logic ---
         function renderCalendarView() {
