@@ -180,19 +180,52 @@ body {
 }
 
 .month-group {
-    margin-bottom: 2rem;
+    margin-bottom: 0.5rem;
 }
 
-.group-title {
-    font-size: 0.9rem;
+.group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.8rem 1rem;
+    background: white;
+    border-radius: 12px;
+    margin-bottom: 0.5rem;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.group-header:active { transform: scale(0.98); }
+
+.group-header h4 { 
+    margin: 0; 
+    color: var(--primary); 
+    font-size: 0.95rem;
     text-transform: capitalize;
-    color: var(--primary);
-    background: rgba(46, 125, 50, 0.05);
-    padding: 0.5rem 1rem;
-    border-radius: 10px;
-    margin-bottom: 1rem;
-    font-weight: 600;
-    width: fit-content;
+}
+
+.group-header i {
+    transition: transform 0.3s ease;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+.month-group.collapsed .group-content {
+    display: none;
+}
+
+.month-group.collapsed .group-header i {
+    transform: rotate(-90deg);
+}
+
+.group-content {
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .badge {
