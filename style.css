@@ -154,15 +154,16 @@ body {
 }
 
 .pest-icon {
-    width: 48px;
-    height: 48px;
+    width: 60px;
+    height: 60px;
     background: #f1f5f9;
-    border-radius: 12px;
+    border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.4rem;
+    font-size: 2.2rem; /* MUCH LARGER ICON */
     color: var(--primary);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05); /* Added depth */
 }
 
 .pest-icon.cucarachas { color: #8d6e63; background: #efebe9; }

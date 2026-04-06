@@ -280,10 +280,9 @@
             dirInput.addEventListener('input', debounce(async (e) => {
                 const q = e.target.value;
                 if (q.length < 3) { suggestionsEl.classList.add('hidden'); return; }
-                suggestionsEl.innerHTML = '<div class="suggestion-item">Buscando...</div>';
+                suggestionsEl.innerHTML = '<div class="suggestion-item">Buscando portal exacto...</div>';
                 suggestionsEl.classList.remove('hidden');
                 try {
-                    // Usamos Nominatim como alternativa más robusta
                     const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=es&limit=5&addressdetails=1`, {
                         headers: { 'Accept-Language': 'es' }
                     });
@@ -295,12 +294,27 @@
                     }
 
                     suggestionsEl.innerHTML = data.map(item => {
-                        const label = item.display_name;
-                        const city = item.address.city || item.address.town || item.address.village || '';
-                        return `<div class="suggestion-item" onclick="selectSuggestion('${label.replace(/'/g, "\\'")}', '${city.replace(/'/g, "\\'")}')">${label}</div>`;
+                        const addr = item.address;
+                        const street = addr.road || addr.pedestrian || addr.path || '';
+                        const number = addr.house_number || '';
+                        const city = addr.city || addr.town || addr.village || addr.suburb || '';
+                        
+                        // Formateamos una etiqueta más legible y exacta
+                        let label = street;
+                        if (number) label += `, ${number}`;
+                        if (city) label += ` (${city})`;
+                        
+                        // Si no hay calle bien definida, usamos el display_name original
+                        const finalLabel = label.length > 5 ? label : item.display_name;
+                        
+                        return `<div class="suggestion-item" onclick="selectSuggestion('${finalLabel.replace(/'/g, "\\'")}', '${city.replace(/'/g, "\\'")}')">
+                            <i class="fas fa-location-dot" style="margin-right:8px; color:var(--primary);"></i>
+                            <strong>${street} ${number ? 'nº ' + number : ''}</strong><br>
+                            <small style="color:gray;">${item.display_name}</small>
+                        </div>`;
                     }).join('');
                 } catch (err) { 
-                    suggestionsEl.innerHTML = `<div class="suggestion-item" style="color:red;">Error: ${err.message}. Intenta con WiFi.</div>`; 
+                    suggestionsEl.innerHTML = `<div class="suggestion-item" style="color:red;">Error: ${err.message}</div>`; 
                 }
             }, 400));
 
