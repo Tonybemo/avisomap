@@ -242,12 +242,18 @@
             viewContainer.innerHTML = `
                 <div class="view-header"><h2>${editData ? 'Editar' : 'Nuevo'} Aviso</h2></div>
                 <form id="aviso-form" class="animate-in">
-                    <div class="form-group">
-                        <label>Dirección</label>
-                        <div class="input-with-icon" style="position:relative;">
-                            <i class="fas fa-search"></i>
-                            <input type="text" id="direccion" class="form-input" placeholder="Escribe dirección..." required autocomplete="off" value="${editData ? editData.direccion : ''}">
-                            <div id="suggestions" class="suggestions-list hidden"></div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex: 2;">
+                            <label>Dirección (Calle)</label>
+                            <div class="input-with-icon" style="position:relative;">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="direccion" class="form-input" placeholder="Nombre de la calle..." required autocomplete="off" value="${editData ? editData.direccion : ''}">
+                                <div id="suggestions" class="suggestions-list hidden"></div>
+                            </div>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label>Portal / Nº</label>
+                            <input type="text" id="portal" class="form-input" placeholder="Ej: 12, 4B..." value="">
                         </div>
                     </div>
                     <div class="form-group"><label>Localidad</label><input type="text" id="localidad" class="form-input" required value="${editData ? editData.localidad : ''}"></div>
@@ -299,15 +305,7 @@
                         const number = addr.house_number || '';
                         const city = addr.city || addr.town || addr.village || addr.suburb || '';
                         
-                        // Formateamos una etiqueta más legible y exacta
-                        let label = street;
-                        if (number) label += `, ${number}`;
-                        if (city) label += ` (${city})`;
-                        
-                        // Si no hay calle bien definida, usamos el display_name original
-                        const finalLabel = label.length > 5 ? label : item.display_name;
-                        
-                        return `<div class="suggestion-item" onclick="selectSuggestion('${finalLabel.replace(/'/g, "\\'")}', '${city.replace(/'/g, "\\'")}')">
+                        return `<div class="suggestion-item" onclick="selectSuggestion('${street.replace(/'/g, "\\'")}', '${number.replace(/'/g, "\\'")}', '${city.replace(/'/g, "\\'")}')">
                             <i class="fas fa-location-dot" style="margin-right:8px; color:var(--primary);"></i>
                             <strong>${street} ${number ? 'nº ' + number : ''}</strong><br>
                             <small style="color:gray;">${item.display_name}</small>
@@ -321,8 +319,9 @@
             document.getElementById('aviso-form').addEventListener('submit', saveAviso);
         }
 
-        window.selectSuggestion = (label, city) => {
-            document.getElementById('direccion').value = label;
+        window.selectSuggestion = (street, number, city) => {
+            document.getElementById('direccion').value = street;
+            document.getElementById('portal').value = number;
             document.getElementById('localidad').value = city;
             document.getElementById('suggestions').classList.add('hidden');
         };
@@ -347,16 +346,19 @@
                     fileUrl = publicUrl;
                 }
 
+                const streetVal = document.getElementById('direccion').value.trim();
+                const portalVal = document.getElementById('portal').value.trim();
+                const completeAddress = portalVal ? `${streetVal}, ${portalVal}` : streetVal;
+
                 const payload = {
                     user_id: currentUser?.id,
-                    direccion: document.getElementById('direccion').value,
+                    direccion: completeAddress,
                     localidad: document.getElementById('localidad').value,
                     fecha: document.getElementById('fecha').value,
                     hora: document.getElementById('hora').value,
                     plaga: document.getElementById('plaga').value,
                     notas: document.getElementById('notas').value,
                 };
-                if (fileUrl) payload.archivo_url = fileUrl;
 
                 if (supabaseClient) {
                     let result;

@@ -323,9 +323,13 @@ body {
 
 /* Form Decorations */
 .form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
     gap: 1rem;
+    align-items: flex-start;
+}
+
+.form-row .form-group {
+    flex: 1;
 }
 
 .input-with-icon {
