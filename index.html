@@ -360,6 +360,10 @@
                     notas: document.getElementById('notas').value,
                 };
 
+                if (fileUrl) {
+                    payload.archivo_url = fileUrl;
+                }
+
                 if (supabaseClient) {
                     let result;
                     if (currentEditingId) {
