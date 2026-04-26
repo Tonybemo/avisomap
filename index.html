@@ -44,6 +44,7 @@
         <nav class="navbar">
             <div class="nav-logo"><i class="fas fa-map-location-dot"></i> <span>Avisomap</span></div>
             <div class="nav-actions">
+                <button id="backup-btn" title="Copia en Drive" onclick="backupToDrive()"><i class="fab fa-google-drive"></i></button>
                 <button id="sync-btn"><i class="fas fa-sync"></i></button>
                 <button id="logout-btn" class="btn-logout"><i class="fas fa-sign-out-alt"></i></button>
             </div>
@@ -65,6 +66,7 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     
     <script>
         // --- Configuration ---
@@ -412,6 +414,92 @@
                 alert('Error al eliminar: ' + err.message);
             }
         };
+
+        // --- GOOGLE DRIVE BACKUP ---
+        let tokenClient;
+
+        function initGoogleAuth() {
+            if (!tokenClient && typeof google !== 'undefined') {
+                tokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: '287885156256-g76u3vdl8eftq2q1jta8n0rvgkl93hnm.apps.googleusercontent.com',
+                    scope: 'https://www.googleapis.com/auth/drive.file',
+                    callback: async (tokenResponse) => {
+                        if (tokenResponse && tokenResponse.access_token) {
+                            await executeBackup(tokenResponse.access_token);
+                        }
+                    },
+                });
+            }
+        }
+
+        window.backupToDrive = function() {
+            if (!currentUser) {
+                alert("Debes iniciar sesión para hacer copias de seguridad.");
+                return;
+            }
+            if (typeof google === 'undefined') {
+                alert("Cargando servicios de Google... Comprueba tu conexión e inténtalo de nuevo.");
+                return;
+            }
+            initGoogleAuth();
+            tokenClient.requestAccessToken();
+        };
+
+        async function executeBackup(accessToken) {
+            const btn = document.getElementById('backup-btn');
+            const originalIcon = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            btn.disabled = true;
+
+            try {
+                if (!avisos || avisos.length === 0) throw new Error("No hay avisos para exportar.");
+                
+                const headers = Object.keys(avisos[0]);
+                let csvContent = "\uFEFF";
+                csvContent += headers.join(',') + "\r\n";
+                
+                avisos.forEach(row => {
+                    const rowData = headers.map(header => {
+                        let val = row[header];
+                        if (val === null || val === undefined) val = "";
+                        val = String(val).replace(/"/g, '""');
+                        if (val.search(/("|,|\n)/g) >= 0) val = `"${val}"`;
+                        return val;
+                    });
+                    csvContent += rowData.join(',') + "\r\n";
+                });
+
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                
+                const appName = "Avisomap";
+                const dateStr = new Date().toISOString().split('T')[0];
+                const fileName = `Respaldo_${appName}_${dateStr}.csv`;
+                
+                const metadata = { name: fileName, mimeType: 'text/csv' };
+                const form = new FormData();
+                form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+                form.append('file', blob);
+
+                const uploadRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                    method: 'POST',
+                    headers: { 'Authorization': 'Bearer ' + accessToken },
+                    body: form
+                });
+                
+                if (!uploadRes.ok) {
+                    const errData = await uploadRes.json();
+                    throw new Error(errData.error?.message || "Error al subir el archivo a Google Drive");
+                }
+                
+                alert("¡Copia de seguridad realizada con éxito!\n\nEl archivo '" + fileName + "' se ha guardado en tu Google Drive.");
+            } catch (err) {
+                console.error("Error en backup:", err);
+                alert("Error al realizar la copia: " + err.message);
+            } finally {
+                btn.innerHTML = originalIcon;
+                btn.disabled = false;
+            }
+        }
 
         // --- Calendar Logic ---
         function renderCalendarView() {
